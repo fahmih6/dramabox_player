@@ -14,7 +14,7 @@ DramaBox Free is a mobile app that allows users to browse and watch a curated se
   - Intelligent auto-play next episode.
   - Seamless playback progress saving and resuming.
 - **Modern Performance**:
-  - Image loading with premium shimmer placeholders using `cached_network_image`.
+  - Image loading with shimmer placeholders using `cached_network_image`.
   - Local data persistence with `hive` for offline caching.
   - Optimized network layer using `dio` and custom interceptors.
 
