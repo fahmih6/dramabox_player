@@ -35,7 +35,7 @@ This project uses the API services provided by **[Sansekai DramaBox API](https:/
 
 1. **Clone the repository**:
    ```bash
-   git clone https://github.com/fahmih6/dramabox_free.git
+   git clone https://github.com/fahmih6/dramabox_player.git
    ```
 2. **Install dependencies**:
    ```bash
