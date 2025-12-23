@@ -29,7 +29,7 @@ The project follows a standard Clean Architecture directory structure:
 
 ## API Credit
 
-This project uses the API services provided by **[Sansekai DramaBox API](https://dramabox.sansekai.my.id)**. Shoutout to the Sansekai for supplying the drama metadata and streaming endpoints.
+This project uses the API services provided by **[Sansekai DramaBox API](https://dramabox.sansekai.my.id)**. Shoutout to Sansekai for supplying the drama metadata and streaming endpoints.
 
 ## Getting Started
 
