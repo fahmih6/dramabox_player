@@ -21,49 +21,51 @@ class DramaDetailsSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bool hasDescription = drama.introduction.trim().isNotEmpty;
-    return ClipRRect(
-      borderRadius: const BorderRadius.only(
-        topLeft: Radius.circular(24),
-        topRight: Radius.circular(24),
-      ),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 25, sigmaY: 25),
-        child: Container(
-          height: MediaQuery.of(context).size.height * 0.75,
-          decoration: BoxDecoration(
-            color: Colors.black.withValues(alpha: 0.7),
-            borderRadius: const BorderRadius.only(
-              topLeft: Radius.circular(24),
-              topRight: Radius.circular(24),
+    return SafeArea(
+      child: ClipRRect(
+        borderRadius: const BorderRadius.only(
+          topLeft: Radius.circular(24),
+          topRight: Radius.circular(24),
+        ),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 25, sigmaY: 25),
+          child: Container(
+            height: MediaQuery.of(context).size.height * 0.75,
+            decoration: BoxDecoration(
+              color: Colors.black.withValues(alpha: 0.7),
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(24),
+                topRight: Radius.circular(24),
+              ),
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.1),
+                width: 0.5,
+              ),
             ),
-            border: Border.all(
-              color: Colors.white.withValues(alpha: 0.1),
-              width: 0.5,
-            ),
-          ),
-          child: Column(
-            children: [
-              _buildHandle(),
-              _buildHeader(context),
-              Expanded(
-                child: DefaultTabController(
-                  length: hasDescription ? 2 : 1,
-                  child: Column(
-                    children: [
-                      _buildTabBar(hasDescription),
-                      Expanded(
-                        child: TabBarView(
-                          children: [
-                            _buildEpisodeGrid(context),
-                            if (hasDescription) _buildDescription(),
-                          ],
+            child: Column(
+              children: [
+                _buildHandle(),
+                _buildHeader(context),
+                Expanded(
+                  child: DefaultTabController(
+                    length: hasDescription ? 2 : 1,
+                    child: Column(
+                      children: [
+                        _buildTabBar(hasDescription),
+                        Expanded(
+                          child: TabBarView(
+                            children: [
+                              _buildEpisodeGrid(context),
+                              if (hasDescription) _buildDescription(),
+                            ],
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
