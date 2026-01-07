@@ -1,11 +1,15 @@
 import 'dart:async';
+import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:dramabox_free/data/models/drama_model.dart';
+import 'package:dramabox_free/presentation/widgets/drama_details_sheet.dart';
 import 'package:cached_video_player_plus/cached_video_player_plus.dart';
 import 'package:video_player/video_player.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:dramabox_free/data/models/episode_model.dart';
 import 'package:dio/dio.dart';
+import 'video_gesture_overlay.dart';
 
 class VideoPlayerItem extends StatefulWidget {
   final EpisodeModel episode;
@@ -18,6 +22,9 @@ class VideoPlayerItem extends StatefulWidget {
   final void Function(int position, int duration, bool isHistoryUpdate)?
   onProgress;
   final int initialPosition;
+  final DramaModel drama;
+  final List<EpisodeModel> episodes;
+  final Function(int) onEpisodeSelected;
 
   const VideoPlayerItem({
     super.key,
@@ -30,6 +37,9 @@ class VideoPlayerItem extends StatefulWidget {
     this.onWatched,
     this.onProgress,
     this.initialPosition = 0,
+    required this.drama,
+    required this.episodes,
+    required this.onEpisodeSelected,
   });
 
   @override
@@ -47,7 +57,7 @@ class _VideoPlayerItemState extends State<VideoPlayerItem> {
   bool _finishedTriggered = false;
   bool _watchedTriggered = false;
   int _lastReportedSecond = -1;
-  bool _isSpeedUp = false;
+  final ValueNotifier<bool> _isSpeedUpNotifier = ValueNotifier<bool>(false);
   String? _seekAction; // 'forward' or 'backward'
   Timer? _seekActionTimer;
 
@@ -311,6 +321,7 @@ class _VideoPlayerItemState extends State<VideoPlayerItem> {
   }
 
   void _toggleUI() {
+    if (!mounted) return;
     setState(() {
       _showUI = !_showUI;
     });
@@ -346,10 +357,12 @@ class _VideoPlayerItemState extends State<VideoPlayerItem> {
     _hideTimer?.cancel();
     _seekActionTimer?.cancel();
     _player?.dispose();
+    _isSpeedUpNotifier.dispose();
     super.dispose();
   }
 
   void _seek(bool forward) async {
+    if (!mounted) return;
     if (!_isInitialized || _player == null) return;
     final player = _player;
     if (player == null) return;
@@ -360,6 +373,7 @@ class _VideoPlayerItemState extends State<VideoPlayerItem> {
 
     await player.controller.seekTo(seekTo);
 
+    if (!mounted) return;
     setState(() {
       _seekAction = forward ? 'forward' : 'backward';
     });
@@ -493,70 +507,59 @@ class _VideoPlayerItemState extends State<VideoPlayerItem> {
               ),
             ),
 
-          // Tap listener for Speed and Seek
+          // Layer 1: Background Toggle Layer (Handles taps on empty space)
           Positioned.fill(
-            child: GestureDetector(
-              onTap: _toggleUI,
-              onLongPressStart: (details) {
-                // Only if on right side
-                if (details.localPosition.dx >
-                    MediaQuery.of(context).size.width / 2) {
-                  _player?.controller.setPlaybackSpeed(1.5);
-                  setState(() => _isSpeedUp = true);
-                }
-              },
-              onLongPressEnd: (_) {
-                _player?.controller.setPlaybackSpeed(1.0);
-                setState(() => _isSpeedUp = false);
-              },
-              onDoubleTapDown: (details) {
-                final isRight =
-                    details.localPosition.dx >
-                    MediaQuery.of(context).size.width / 2;
-                _seek(isRight);
-              },
-              child: Container(color: Colors.transparent),
+            child: VideoGestureOverlay(
+              onToggleUI: _toggleUI,
+              onSeek: _seek,
+              controller: _isInitialized ? _player?.controller : null,
+              isSpeedUpNotifier: _isSpeedUpNotifier,
             ),
           ),
 
           // Visual Feedback for Speed Up
-          if (_isSpeedUp)
-            Positioned(
-              top: MediaQuery.of(context).padding.top + 80,
-              left: 0,
-              right: 0,
-              child: Center(
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 8,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.black54,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.fast_forward_rounded,
-                        color: Colors.amber,
-                        size: 20,
-                      ),
-                      SizedBox(width: 8),
-                      Text(
-                        '1.5x Speed Playing',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
+          ValueListenableBuilder<bool>(
+            valueListenable: _isSpeedUpNotifier,
+            builder: (context, isSpeedUp, child) {
+              if (!isSpeedUp) return const SizedBox();
+              return Positioned(
+                top: MediaQuery.of(context).padding.top + 80,
+                left: 0,
+                right: 0,
+                child: Center(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.black54,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.fast_forward_rounded,
+                          color: Colors.amber,
+                          size: 20,
                         ),
-                      ),
-                    ],
+                        SizedBox(width: 8),
+                        Text(
+                          '1.5x Speed Playing',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-            ),
+              );
+            },
+          ),
 
           // Visual Feedback for Seeking
           if (_seekAction != null)
@@ -591,82 +594,128 @@ class _VideoPlayerItemState extends State<VideoPlayerItem> {
               ),
             ),
 
+          // Layer 2: UI Bars & Buttons
           // Top Bar (Back button + Episode Index)
           AnimatedOpacity(
             opacity: _showUI ? 1.0 : 0.0,
             duration: const Duration(milliseconds: 300),
-            child: SafeArea(
-              child: Padding(
+            child: GestureDetector(
+              onTap: _toggleUI,
+              behavior: HitTestBehavior.translucent,
+              child: Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 8.0,
                   vertical: 8.0,
                 ),
-                child: Row(
-                  children: [
-                    GestureDetector(
-                      onTap: widget.onBack,
-                      child: Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: const BoxDecoration(
-                          color: Colors.black38,
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Icons.arrow_back,
-                          color: Colors.white,
-                          size: 24,
-                        ),
-                      ),
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.2),
+                  border: Border(
+                    bottom: BorderSide(
+                      color: Colors.white.withValues(alpha: 0.05),
+                      width: 0.5,
                     ),
-                    const SizedBox(width: 16),
-                    Text(
-                      'Ep. ${widget.index + 1}',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const Spacer(),
-                    if (widget.episode.subtitles.isNotEmpty)
+                  ),
+                ),
+                child: SafeArea(
+                  bottom: false,
+                  child: Row(
+                    children: [
                       GestureDetector(
-                        onTap: () => setState(
-                          () => _subtitlesEnabled = !_subtitlesEnabled,
-                        ),
+                        onTap: () {
+                          widget.onBack();
+                          _startHideTimer();
+                        },
                         child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 6,
-                          ),
+                          padding: const EdgeInsets.all(8),
                           decoration: BoxDecoration(
-                            color: _subtitlesEnabled
-                                ? Colors.redAccent
-                                : Colors.black38,
-                            borderRadius: BorderRadius.circular(20),
+                            color: Colors.white.withValues(alpha: 0.1),
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.1),
+                              width: 0.5,
+                            ),
                           ),
-                          child: Row(
-                            children: [
-                              Icon(
-                                _subtitlesEnabled
-                                    ? Icons.closed_caption
-                                    : Icons.closed_caption_disabled,
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(20),
+                            child: BackdropFilter(
+                              filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                              child: const Icon(
+                                Icons.arrow_back,
                                 color: Colors.white,
-                                size: 18,
+                                size: 24,
                               ),
-                              const SizedBox(width: 4),
-                              const Text(
-                                'CC',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Text(
+                        'Ep. ${widget.index + 1} / ${widget.episodes.length} Episodes',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: -0.5,
+                        ),
+                      ),
+                      const Spacer(),
+                      if (widget.episode.subtitles.isNotEmpty)
+                        GestureDetector(
+                          onTap: () {
+                            setState(() {
+                              _subtitlesEnabled = !_subtitlesEnabled;
+                            });
+                            _startHideTimer();
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 6,
+                            ),
+                            decoration: BoxDecoration(
+                              color: _subtitlesEnabled
+                                  ? Colors.redAccent.withValues(alpha: 0.8)
+                                  : Colors.white.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                color: Colors.white.withValues(alpha: 0.1),
+                                width: 0.5,
+                              ),
+                            ),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(20),
+                              child: BackdropFilter(
+                                filter: ImageFilter.blur(
+                                  sigmaX: 10,
+                                  sigmaY: 10,
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      _subtitlesEnabled
+                                          ? Icons.closed_caption
+                                          : Icons.closed_caption_disabled,
+                                      color: Colors.white,
+                                      size: 18,
+                                    ),
+                                    const SizedBox(width: 4),
+                                    const Text(
+                                      'CC',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
-                            ],
+                            ),
                           ),
                         ),
-                      ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -680,133 +729,214 @@ class _VideoPlayerItemState extends State<VideoPlayerItem> {
             child: AnimatedOpacity(
               opacity: _showUI ? 1.0 : 0.0,
               duration: const Duration(milliseconds: 300),
-              child: Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.bottomCenter,
-                    end: Alignment.topCenter,
-                    colors: [
-                      Colors.black.withValues(alpha: 0.9),
-                      Colors.black.withValues(alpha: 0.5),
-                      Colors.transparent,
-                    ],
+              child: GestureDetector(
+                onTap: _toggleUI,
+                behavior: HitTestBehavior.translucent,
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.bottomCenter,
+                      end: Alignment.topCenter,
+                      colors: [
+                        Colors.black.withValues(alpha: 0.8),
+                        Colors.black.withValues(alpha: 0.4),
+                        Colors.transparent,
+                      ],
+                    ),
+                  ),
+                  child: SafeArea(
+                    top: false,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const SizedBox(height: 12),
+                        // Controls Row: Play/Pause + Duration
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                          child: Row(
+                            children: [
+                              if (_isInitialized && _player != null)
+                                GestureDetector(
+                                  onTap: () {
+                                    final controller = _player?.controller;
+                                    if (controller == null) return;
+                                    if (controller.value.isPlaying) {
+                                      controller.pause();
+                                    } else {
+                                      controller.play();
+                                    }
+                                    setState(() {});
+                                    _startHideTimer();
+                                  },
+                                  child: Container(
+                                    padding: const EdgeInsets.all(4),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white.withValues(
+                                        alpha: 0.1,
+                                      ),
+                                      shape: BoxShape.circle,
+                                      border: Border.all(
+                                        color: Colors.white.withValues(
+                                          alpha: 0.1,
+                                        ),
+                                        width: 0.5,
+                                      ),
+                                    ),
+                                    child: ClipRRect(
+                                      borderRadius: BorderRadius.circular(20),
+                                      child: BackdropFilter(
+                                        filter: ImageFilter.blur(
+                                          sigmaX: 10,
+                                          sigmaY: 10,
+                                        ),
+                                        child: Icon(
+                                          _player?.controller.value.isPlaying ??
+                                                  false
+                                              ? Icons.pause_rounded
+                                              : Icons.play_arrow_rounded,
+                                          color: Colors.white,
+                                          size: 32,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              const SizedBox(width: 12),
+                              if (_isInitialized && _player != null)
+                                Builder(
+                                  builder: (context) {
+                                    final player = _player;
+                                    if (player == null) {
+                                      return const SizedBox();
+                                    }
+                                    return ValueListenableBuilder(
+                                      valueListenable: player.controller,
+                                      builder:
+                                          (
+                                            context,
+                                            VideoPlayerValue value,
+                                            child,
+                                          ) {
+                                            return Text(
+                                              '${_formatDuration(value.position)} / ${_formatDuration(value.duration)}',
+                                              style: const TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 14,
+                                                fontWeight: FontWeight.w600,
+                                                fontFeatures: [
+                                                  FontFeature.tabularFigures(),
+                                                ],
+                                              ),
+                                            );
+                                          },
+                                    );
+                                  },
+                                ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+
+                        if (_isInitialized && _player != null)
+                          Builder(
+                            builder: (context) {
+                              final player = _player;
+                              if (player == null) {
+                                return const SizedBox(height: 4);
+                              }
+                              return Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16.0,
+                                ),
+                                child: VideoProgressIndicator(
+                                  player.controller,
+                                  allowScrubbing: true,
+                                  colors: const VideoProgressColors(
+                                    playedColor: Colors.amber,
+                                    bufferedColor: Colors.grey,
+                                    backgroundColor: Colors.white24,
+                                  ),
+                                ),
+                              );
+                            },
+                          )
+                        else
+                          const SizedBox(height: 4),
+
+                        const SizedBox(height: 16),
+
+                        // Drama Title & Episode Info
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                widget.dramaTitle,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  shadows: [
+                                    Shadow(blurRadius: 10, color: Colors.black),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(height: 20),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-                child: SafeArea(
-                  top: false,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Controls Row: Play/Pause + Duration
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                        child: Row(
-                          children: [
-                            if (_isInitialized && _player != null)
-                              GestureDetector(
-                                onTap: () {
-                                  final controller = _player?.controller;
-                                  if (controller == null) return;
-                                  if (controller.value.isPlaying) {
-                                    controller.pause();
-                                  } else {
-                                    controller.play();
-                                  }
-                                  setState(() {});
-                                  _startHideTimer();
-                                },
-                                child: Icon(
-                                  _player?.controller.value.isPlaying ?? false
-                                      ? Icons.pause_rounded
-                                      : Icons.play_arrow_rounded,
-                                  color: Colors.white,
-                                  size: 28,
-                                ),
-                              ),
-                            const SizedBox(width: 12),
-                            if (_isInitialized && _player != null)
-                              Builder(
-                                builder: (context) {
-                                  final player = _player;
-                                  if (player == null) {
-                                    return const SizedBox();
-                                  }
-                                  return ValueListenableBuilder(
-                                    valueListenable: player.controller,
-                                    builder:
-                                        (
-                                          context,
-                                          VideoPlayerValue value,
-                                          child,
-                                        ) {
-                                          return Text(
-                                            '${_formatDuration(value.position)} / ${_formatDuration(value.duration)}',
-                                            style: const TextStyle(
-                                              color: Colors.white,
-                                              fontSize: 14,
-                                              fontWeight: FontWeight.w500,
-                                            ),
-                                          );
-                                        },
-                                  );
-                                },
-                              ),
-                          ],
-                        ),
+              ),
+            ),
+          ),
+
+          // List Button for Episode Selection (Overlay)
+          Positioned(
+            right: 16,
+            bottom: 120, // Positioned above the title/progress area
+            child: AnimatedOpacity(
+              opacity: _showUI ? 1.0 : 0.0,
+              duration: const Duration(milliseconds: 300),
+              child: GestureDetector(
+                onTap: () {
+                  showModalBottomSheet(
+                    context: context,
+                    isScrollControlled: true,
+                    backgroundColor: Colors.transparent,
+                    builder: (context) => DramaDetailsSheet(
+                      drama: widget.drama,
+                      episodes: widget.episodes,
+                      currentIndex: widget.index,
+                      onEpisodeSelected: widget.onEpisodeSelected,
+                    ),
+                  );
+                  _startHideTimer();
+                },
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.1),
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.15),
+                      width: 1,
+                    ),
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(20),
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                      child: const Icon(
+                        Icons.format_list_bulleted_rounded,
+                        color: Colors.white,
+                        size: 24,
                       ),
-                      const SizedBox(height: 8),
-
-                      if (_isInitialized && _player != null)
-                        Builder(
-                          builder: (context) {
-                            final player = _player;
-                            if (player == null) {
-                              return const SizedBox(height: 4);
-                            }
-                            return Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16.0,
-                              ),
-                              child: VideoProgressIndicator(
-                                player.controller,
-                                allowScrubbing: true,
-                                colors: const VideoProgressColors(
-                                  playedColor: Colors.amber,
-                                  bufferedColor: Colors.grey,
-                                  backgroundColor: Colors.white24,
-                                ),
-                              ),
-                            );
-                          },
-                        )
-                      else
-                        const SizedBox(height: 4),
-
-                      const SizedBox(height: 20),
-
-                      // Drama Title & Episode Info
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              widget.dramaTitle,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                shadows: [
-                                  Shadow(blurRadius: 10, color: Colors.black),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(height: 16),
-                          ],
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
                 ),
               ),

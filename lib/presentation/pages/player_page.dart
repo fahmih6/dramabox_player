@@ -113,6 +113,15 @@ class _PlayerPageState extends State<PlayerPage> {
                   index: index,
                   isVisible: _currentIndex == index,
                   dramaTitle: widget.drama.bookName,
+                  drama: widget.drama,
+                  episodes: state.episodes,
+                  onEpisodeSelected: (newIndex) {
+                    if (newIndex >= 0 && newIndex < state.episodes.length) {
+                      _pageController?.jumpTo(
+                        newIndex * MediaQuery.of(context).size.height,
+                      );
+                    }
+                  },
                   onBack: () => Navigator.pop(context),
                   onFinished: () {
                     if (index < state.episodes.length - 1) {
