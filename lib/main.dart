@@ -9,6 +9,7 @@ import 'package:dramabox_free/presentation/blocs/player_bloc.dart';
 import 'package:dramabox_free/presentation/blocs/history_bloc.dart';
 import 'package:dramabox_free/presentation/cubits/navigation_cubit.dart';
 import 'package:dramabox_free/core/services/shorebird_service.dart';
+import 'package:dramabox_free/core/services/video_proxy_service.dart';
 import 'package:dramabox_free/presentation/pages/home_page.dart';
 
 void main() async {
@@ -18,6 +19,7 @@ void main() async {
   await Hive.initFlutter();
   await di.init();
   await di.sl<ShorebirdService>().init();
+  await di.sl<VideoProxyService>().init();
 
   runApp(const MyApp());
 }
