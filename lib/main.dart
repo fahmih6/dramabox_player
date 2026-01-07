@@ -4,6 +4,8 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:dramabox_free/core/di/injection_container.dart' as di;
 import 'package:dramabox_free/presentation/blocs/home_bloc.dart';
 import 'package:dramabox_free/presentation/blocs/player_bloc.dart';
+import 'package:dramabox_free/presentation/blocs/history_bloc.dart';
+import 'package:dramabox_free/presentation/cubits/navigation_cubit.dart';
 import 'package:dramabox_free/core/services/shorebird_service.dart';
 import 'package:dramabox_free/presentation/pages/home_page.dart';
 
@@ -25,9 +27,15 @@ class MyApp extends StatelessWidget {
     return MultiBlocProvider(
       providers: [
         BlocProvider<HomeBloc>(
-          create: (context) => di.sl<HomeBloc>()..add(FetchHomeDataEvent()),
+          create: (context) => di.sl<HomeBloc>()..add(PreloadAllEvent()),
         ),
         BlocProvider<PlayerBloc>(create: (context) => di.sl<PlayerBloc>()),
+        BlocProvider<HistoryBloc>(
+          create: (context) => di.sl<HistoryBloc>()..add(LoadHistoryEvent()),
+        ),
+        BlocProvider<NavigationCubit>(
+          create: (context) => di.sl<NavigationCubit>(),
+        ),
       ],
       child: MaterialApp(
         title: 'DramaBox',

@@ -6,7 +6,7 @@ class NetworkClient {
   NetworkClient()
     : dio = Dio(
         BaseOptions(
-          baseUrl: 'https://dramabox.sansekai.my.id/api',
+          baseUrl: 'https://api.sansekai.my.id/api',
           connectTimeout: const Duration(seconds: 60),
           receiveTimeout: const Duration(seconds: 60),
           headers: {'accept': 'application/json'},

@@ -36,7 +36,16 @@ class DramaModel extends Equatable {
                 ? List<String>.from(json['tagNames'])
                 : []),
       protagonist: json['protagonist'] ?? '',
-      chapterCount: json['chapterCount'] ?? 0,
+      chapterCount:
+          int.tryParse(
+            (json['chapterCount'] ??
+                    json['totalChapter'] ??
+                    json['chapterTotal'] ??
+                    json['episodeCount'] ??
+                    '0')
+                .toString(),
+          ) ??
+          0,
       ranking: rankVo != null ? rankVo['sort'] : json['ranking'],
       hotCode: rankVo != null ? rankVo['hotCode'] : json['hotCode'],
     );
@@ -54,6 +63,30 @@ class DramaModel extends Equatable {
       'ranking': ranking,
       'hotCode': hotCode,
     };
+  }
+
+  DramaModel copyWith({
+    String? bookId,
+    String? bookName,
+    String? coverWap,
+    String? introduction,
+    List<String>? tags,
+    String? protagonist,
+    int? chapterCount,
+    int? ranking,
+    String? hotCode,
+  }) {
+    return DramaModel(
+      bookId: bookId ?? this.bookId,
+      bookName: bookName ?? this.bookName,
+      coverWap: coverWap ?? this.coverWap,
+      introduction: introduction ?? this.introduction,
+      tags: tags ?? this.tags,
+      protagonist: protagonist ?? this.protagonist,
+      chapterCount: chapterCount ?? this.chapterCount,
+      ranking: ranking ?? this.ranking,
+      hotCode: hotCode ?? this.hotCode,
+    );
   }
 
   @override
