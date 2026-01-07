@@ -317,10 +317,6 @@ class _VideoPlayerItemState extends State<VideoPlayerItem> {
     });
   }
 
-  void _toggleUI() {
-    context.read<VideoControlCubit>().toggleControls();
-  }
-
   @override
   void didUpdateWidget(VideoPlayerItem oldWidget) {
     super.didUpdateWidget(oldWidget);
@@ -606,9 +602,8 @@ class _VideoPlayerItemState extends State<VideoPlayerItem> {
                 AnimatedOpacity(
                   opacity: _showUI ? 1.0 : 0.0,
                   duration: const Duration(milliseconds: 300),
-                  child: GestureDetector(
-                    onTap: _toggleUI,
-                    behavior: HitTestBehavior.translucent,
+                  child: IgnorePointer(
+                    ignoring: !_showUI, // Prevent clicks when hidden
                     child: Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 8.0,
@@ -737,9 +732,8 @@ class _VideoPlayerItemState extends State<VideoPlayerItem> {
                   child: AnimatedOpacity(
                     opacity: _showUI ? 1.0 : 0.0,
                     duration: const Duration(milliseconds: 300),
-                    child: GestureDetector(
-                      onTap: _toggleUI,
-                      behavior: HitTestBehavior.translucent,
+                    child: IgnorePointer(
+                      ignoring: !_showUI, // Prevent clicks when hidden
                       child: Container(
                         decoration: BoxDecoration(
                           gradient: LinearGradient(
