@@ -10,7 +10,10 @@ import 'package:shimmer/shimmer.dart';
 import 'package:dramabox_free/data/models/episode_model.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:dramabox_free/core/services/video_proxy_service.dart';
+import 'package:dramabox_free/core/di/injection_container.dart' as di;
 import 'package:dramabox_free/presentation/cubits/video_control_cubit.dart';
+import 'package:dramabox_free/core/constants/app_enums.dart';
 import 'video_gesture_overlay.dart';
 
 class VideoPlayerItem extends StatefulWidget {
@@ -27,6 +30,7 @@ class VideoPlayerItem extends StatefulWidget {
   final DramaModel drama;
   final List<EpisodeModel> episodes;
   final Function(int) onEpisodeSelected;
+  final AppContentProvider provider;
 
   const VideoPlayerItem({
     super.key,
@@ -42,6 +46,7 @@ class VideoPlayerItem extends StatefulWidget {
     required this.drama,
     required this.episodes,
     required this.onEpisodeSelected,
+    required this.provider,
   });
 
   @override
@@ -224,8 +229,14 @@ class _VideoPlayerItemState extends State<VideoPlayerItem> {
     });
 
     try {
+      String videoUrl = widget.episode.videoUrl;
+      // Only use proxy for Netshort on Android
+      if (widget.provider == AppContentProvider.netshort) {
+        videoUrl = di.sl<VideoProxyService>().getProxyUrl(videoUrl);
+      }
+
       _player = CachedVideoPlayerPlus.networkUrl(
-        Uri.parse(widget.episode.videoUrl),
+        Uri.parse(videoUrl),
         invalidateCacheIfOlderThan: const Duration(days: 7),
       );
 

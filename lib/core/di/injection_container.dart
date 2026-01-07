@@ -1,5 +1,6 @@
 import 'package:get_it/get_it.dart';
 import 'package:dramabox_free/core/services/shorebird_service.dart';
+import 'package:dramabox_free/core/services/video_proxy_service.dart';
 import 'package:dramabox_free/core/network/network_client.dart';
 import 'package:dramabox_free/data/datasources/drama_local_data_source.dart';
 import 'package:dramabox_free/data/datasources/drama_remote_data_source.dart';
@@ -16,6 +17,7 @@ final sl = GetIt.instance;
 Future<void> init() async {
   // Services
   sl.registerLazySingleton(() => ShorebirdService());
+  sl.registerLazySingleton(() => VideoProxyService());
 
   // Blocs
   sl.registerFactory(() => HomeBloc(repository: sl()));

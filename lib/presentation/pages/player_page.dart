@@ -170,6 +170,7 @@ class _PlayerPageState extends State<PlayerPage> {
                   initialPosition: index == state.initialIndex
                       ? state.initialPosition
                       : 0,
+                  provider: widget.provider,
                 );
               }, childCount: state.episodes.length),
             ),
