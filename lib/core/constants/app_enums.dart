@@ -1,0 +1,1 @@
+enum AppContentProvider { dramabox, netshort }

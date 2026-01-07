@@ -1,6 +1,6 @@
 # DramaBox Free
 
-An open-source Flutter application for streaming short dramas from Dramabox.
+100% AI slop. An open-source Flutter application for streaming short dramas from Dramabox.
 
 ## Overview
 
@@ -29,7 +29,7 @@ The project follows a standard Clean Architecture directory structure:
 
 ## API Credit
 
-This project uses the API services provided by **[Sansekai DramaBox API](https://dramabox.sansekai.my.id)**. Shoutout to Sansekai for supplying the drama metadata and streaming endpoints.
+This project uses the API services provided by **[Sansekai DramaBox API](https://api.sansekai.my.id/)**. Shoutout to Sansekai for supplying the drama metadata and streaming endpoints.
 
 ## Getting Started
 

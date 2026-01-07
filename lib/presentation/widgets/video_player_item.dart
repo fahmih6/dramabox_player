@@ -5,6 +5,7 @@ import 'package:video_player/video_player.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:dramabox_free/data/models/episode_model.dart';
+import 'package:dio/dio.dart';
 
 class VideoPlayerItem extends StatefulWidget {
   final EpisodeModel episode;
@@ -13,6 +14,10 @@ class VideoPlayerItem extends StatefulWidget {
   final String dramaTitle;
   final VoidCallback onBack;
   final VoidCallback? onFinished;
+  final VoidCallback? onWatched;
+  final void Function(int position, int duration, bool isHistoryUpdate)?
+  onProgress;
+  final int initialPosition;
 
   const VideoPlayerItem({
     super.key,
@@ -22,6 +27,9 @@ class VideoPlayerItem extends StatefulWidget {
     required this.dramaTitle,
     required this.onBack,
     this.onFinished,
+    this.onWatched,
+    this.onProgress,
+    this.initialPosition = 0,
   });
 
   @override
@@ -37,15 +45,157 @@ class _VideoPlayerItemState extends State<VideoPlayerItem> {
   bool _showUI = true;
   Timer? _hideTimer;
   bool _finishedTriggered = false;
+  bool _watchedTriggered = false;
+  int _lastReportedSecond = -1;
   bool _isSpeedUp = false;
   String? _seekAction; // 'forward' or 'backward'
   Timer? _seekActionTimer;
 
+  // Subtitle state
+  SubtitleModel? _selectedSubtitle;
+  List<Caption> _captions = [];
+  String _currentCaption = '';
+  bool _subtitlesEnabled = true;
+
   @override
   void initState() {
     super.initState();
+    _selectSubtitle();
     _initializeController();
     _startHideTimer();
+  }
+
+  void _selectSubtitle() {
+    if (widget.episode.subtitles.isEmpty) return;
+
+    // Prioritize Indonesia (ID) first
+    _selectedSubtitle = widget.episode.subtitles.firstWhere(
+      (s) => s.language.toLowerCase().contains('id'),
+      orElse: () => widget.episode.subtitles.firstWhere(
+        (s) => s.language.toLowerCase().contains('en'),
+        orElse: () => widget.episode.subtitles.first,
+      ),
+    );
+
+    if (_selectedSubtitle != null) {
+      _loadSubtitles(_selectedSubtitle!.url);
+    }
+  }
+
+  Future<void> _loadSubtitles(String url) async {
+    try {
+      final response = await Dio().get(url);
+      if (response.data is String) {
+        final vttContent = response.data as String;
+        _parseVTT(vttContent);
+      }
+    } catch (e) {
+      debugPrint("Error loading subtitles: $e");
+    }
+  }
+
+  void _parseVTT(String content) {
+    try {
+      final lines = content.split('\n');
+      final List<Caption> captions = [];
+
+      for (int i = 0; i < lines.length; i++) {
+        final line = lines[i].trim();
+        if (line.contains('-->')) {
+          final times = line.split('-->');
+          if (times.length == 2) {
+            final startTimePart = times[0].trim();
+            final endTimeLine = times[1].trim();
+            final endTimePart = endTimeLine.split(' ')[0];
+
+            final start = _parseVTTTime(startTimePart);
+            final end = _parseVTTTime(endTimePart);
+
+            // Text can be on multiple lines until an empty line
+            String text = '';
+            i++;
+            while (i < lines.length && lines[i].trim().isNotEmpty) {
+              if (text.isNotEmpty) text += '\n';
+              text += lines[i].trim();
+              i++;
+            }
+
+            if (text.isNotEmpty) {
+              captions.add(
+                Caption(
+                  number: captions.length,
+                  start: start,
+                  end: end,
+                  text: text,
+                ),
+              );
+            }
+          }
+        }
+      }
+
+      if (mounted) {
+        setState(() {
+          _captions = captions;
+        });
+      }
+    } catch (e) {
+      debugPrint("Error parsing VTT: $e");
+    }
+  }
+
+  Duration _parseVTTTime(String time) {
+    // Format: 00:00:00.000 or 00:00.000
+    final parts = time.split(':');
+    if (parts.length == 3) {
+      final hours = int.parse(parts[0]);
+      final minutes = int.parse(parts[1]);
+      final secondsParts = parts[2].split('.');
+      final seconds = int.parse(secondsParts[0]);
+      final milliseconds = int.parse(secondsParts[1]);
+      return Duration(
+        hours: hours,
+        minutes: minutes,
+        seconds: seconds,
+        milliseconds: milliseconds,
+      );
+    } else if (parts.length == 2) {
+      final minutes = int.parse(parts[0]);
+      final secondsParts = parts[1].split('.');
+      final seconds = int.parse(secondsParts[0]);
+      final milliseconds = int.parse(secondsParts[1]);
+      return Duration(
+        minutes: minutes,
+        seconds: seconds,
+        milliseconds: milliseconds,
+      );
+    }
+    return Duration.zero;
+  }
+
+  void _updateCurrentCaption(Duration position) {
+    if (_captions.isEmpty || !_subtitlesEnabled) {
+      if (_currentCaption.isNotEmpty) {
+        setState(() => _currentCaption = '');
+      }
+      return;
+    }
+
+    final caption = _captions.firstWhere(
+      (c) => position >= c.start && position <= c.end,
+      orElse: () => const Caption(
+        number: -1,
+        start: Duration.zero,
+        end: Duration.zero,
+        text: '',
+      ),
+    );
+
+    if (_currentCaption != caption.text) {
+      setState(() {
+        _currentCaption = caption.text;
+      });
+    }
   }
 
   void _initializeController() async {
@@ -82,6 +232,13 @@ class _VideoPlayerItemState extends State<VideoPlayerItem> {
           _isInitialized = true;
           _isInitializing = false;
         });
+
+        if (widget.initialPosition > 0) {
+          _player?.controller.seekTo(
+            Duration(milliseconds: widget.initialPosition),
+          );
+        }
+
         if (widget.isVisible) {
           _player?.controller.play();
         }
@@ -106,11 +263,39 @@ class _VideoPlayerItemState extends State<VideoPlayerItem> {
     final position = player.controller.value.position;
     final duration = player.controller.value.duration;
 
+    _updateCurrentCaption(position);
+
     if (position >= duration &&
         duration != Duration.zero &&
         !_finishedTriggered) {
       _finishedTriggered = true;
       widget.onFinished?.call();
+      // Also ensure watched is triggered if it hasn't been yet (for short episodes)
+      if (widget.isVisible && !_watchedTriggered) {
+        _watchedTriggered = true;
+        widget.onWatched?.call();
+      }
+    }
+
+    if (widget.isVisible && !_watchedTriggered) {
+      final threshold = widget.index == 0 ? 10 : 3;
+      if (position.inSeconds >= threshold) {
+        _watchedTriggered = true;
+        widget.onWatched?.call();
+      }
+    }
+
+    // Process periodic progress updates
+    if (widget.isVisible) {
+      final currentSecond = position.inSeconds;
+      if (currentSecond != _lastReportedSecond) {
+        _lastReportedSecond = currentSecond;
+        widget.onProgress?.call(
+          position.inMilliseconds,
+          duration.inMilliseconds,
+          currentSecond % 2 == 0,
+        );
+      }
     }
   }
 
@@ -140,8 +325,12 @@ class _VideoPlayerItemState extends State<VideoPlayerItem> {
     if (oldWidget.episode.videoUrl != widget.episode.videoUrl) {
       _isInitialized = false;
       _finishedTriggered = false;
+      _watchedTriggered = false;
       _player?.dispose();
       _player = null;
+      _captions = [];
+      _currentCaption = '';
+      _selectSubtitle();
       _initializeController();
     } else if (_isInitialized) {
       if (widget.isVisible) {
@@ -225,6 +414,45 @@ class _VideoPlayerItemState extends State<VideoPlayerItem> {
                   )
                 : const SizedBox(),
           ),
+
+          // Subtitle Overlay
+          if (_currentCaption.isNotEmpty && _subtitlesEnabled)
+            Positioned(
+              bottom: _showUI ? 220 : 160,
+              left: 32,
+              right: 32,
+              child: IgnorePointer(
+                child: Center(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 18,
+                      vertical: 10,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.black54,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      _currentCaption,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        height: 1.2,
+                        shadows: [
+                          Shadow(
+                            blurRadius: 4,
+                            color: Colors.black,
+                            offset: Offset(1, 1),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
 
           // Loading indicator on top of thumbnail if not initialized and no error
           if (!_isInitialized && !_hasError)
@@ -399,6 +627,45 @@ class _VideoPlayerItemState extends State<VideoPlayerItem> {
                         fontWeight: FontWeight.bold,
                       ),
                     ),
+                    const Spacer(),
+                    if (widget.episode.subtitles.isNotEmpty)
+                      GestureDetector(
+                        onTap: () => setState(
+                          () => _subtitlesEnabled = !_subtitlesEnabled,
+                        ),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: _subtitlesEnabled
+                                ? Colors.redAccent
+                                : Colors.black38,
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                _subtitlesEnabled
+                                    ? Icons.closed_caption
+                                    : Icons.closed_caption_disabled,
+                                color: Colors.white,
+                                size: 18,
+                              ),
+                              const SizedBox(width: 4),
+                              const Text(
+                                'CC',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
                   ],
                 ),
               ),

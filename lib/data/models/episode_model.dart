@@ -1,19 +1,54 @@
 import 'package:equatable/equatable.dart';
 
+class SubtitleModel extends Equatable {
+  final String url;
+  final String format;
+  final String language;
+
+  const SubtitleModel({
+    required this.url,
+    required this.format,
+    required this.language,
+  });
+
+  factory SubtitleModel.fromJson(Map<String, dynamic> json) {
+    return SubtitleModel(
+      url: json['url'] ?? '',
+      format: json['format'] ?? '',
+      language: json['subtitleLanguage'] ?? json['language'] ?? '',
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {'url': url, 'format': format, 'subtitleLanguage': language};
+  }
+
+  @override
+  List<Object?> get props => [url, format, language];
+}
+
 class EpisodeModel extends Equatable {
   final String chapterId;
   final String chapterName;
   final String videoUrl;
   final String chapterImg;
+  final List<SubtitleModel> subtitles;
 
   const EpisodeModel({
     required this.chapterId,
     required this.chapterName,
     required this.videoUrl,
     required this.chapterImg,
+    this.subtitles = const [],
   });
 
   factory EpisodeModel.fromJson(Map<String, dynamic> json) {
+    final List<SubtitleModel> subtitles = [];
+    if (json['subtitles'] != null) {
+      final list = json['subtitles'] as List;
+      subtitles.addAll(list.map((e) => SubtitleModel.fromJson(e)));
+    }
+
     // Check if it's already a parsed model from cache
     if (json.containsKey('videoUrl') &&
         (json['videoUrl'] as String).isNotEmpty) {
@@ -22,6 +57,7 @@ class EpisodeModel extends Equatable {
         chapterName: json['chapterName'] ?? '',
         videoUrl: json['videoUrl'] ?? '',
         chapterImg: json['chapterImg'] ?? '',
+        subtitles: subtitles,
       );
     }
 
@@ -48,7 +84,8 @@ class EpisodeModel extends Equatable {
       chapterId: json['chapterId']?.toString() ?? '',
       chapterName: json['chapterName'] ?? '',
       videoUrl: foundUrl,
-      chapterImg: json['chapterImg'] ?? json['chapterImg'] ?? '',
+      chapterImg: json['chapterImg'] ?? '',
+      subtitles: subtitles,
     );
   }
 
@@ -58,9 +95,16 @@ class EpisodeModel extends Equatable {
       'chapterName': chapterName,
       'videoUrl': videoUrl,
       'chapterImg': chapterImg,
+      'subtitles': subtitles.map((e) => e.toJson()).toList(),
     };
   }
 
   @override
-  List<Object?> get props => [chapterId, chapterName, videoUrl, chapterImg];
+  List<Object?> get props => [
+    chapterId,
+    chapterName,
+    videoUrl,
+    chapterImg,
+    subtitles,
+  ];
 }

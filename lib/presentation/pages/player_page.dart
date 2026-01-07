@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:dramabox_free/core/constants/app_enums.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:dramabox_free/data/models/drama_model.dart';
@@ -8,8 +9,13 @@ import 'package:wakelock_plus/wakelock_plus.dart';
 
 class PlayerPage extends StatefulWidget {
   final DramaModel drama;
+  final AppContentProvider provider;
 
-  const PlayerPage({super.key, required this.drama});
+  const PlayerPage({
+    super.key,
+    required this.drama,
+    this.provider = AppContentProvider.dramabox,
+  });
 
   @override
   State<PlayerPage> createState() => _PlayerPageState();
@@ -23,7 +29,9 @@ class _PlayerPageState extends State<PlayerPage> {
   void initState() {
     super.initState();
     // Start loading data immediately
-    context.read<PlayerBloc>().add(LoadEpisodesEvent(widget.drama.bookId));
+    context.read<PlayerBloc>().add(
+      LoadEpisodesEvent(widget.drama.bookId, provider: widget.provider),
+    );
     WakelockPlus.enable();
   }
 
@@ -43,10 +51,13 @@ class _PlayerPageState extends State<PlayerPage> {
         if (state is PlayerLoaded) {
           // Initialize or reset the controller with the saved index
           if (_pageController == null) {
-            _currentIndex = state.initialIndex;
+            final initialIndex = state.initialIndex == -1
+                ? 0
+                : state.initialIndex;
+            _currentIndex = initialIndex;
             final screenHeight = MediaQuery.of(context).size.height;
             _pageController = ScrollController(
-              initialScrollOffset: state.initialIndex * screenHeight,
+              initialScrollOffset: initialIndex * screenHeight,
             );
           }
         }
@@ -82,11 +93,6 @@ class _PlayerPageState extends State<PlayerPage> {
                 });
               }
             }
-          } else if (notification is ScrollEndNotification) {
-            // Save progress when scrolling stops
-            context.read<PlayerBloc>().add(
-              SaveProgressEvent(widget.drama.bookId, _currentIndex),
-            );
           }
           return false;
         },
@@ -117,6 +123,44 @@ class _PlayerPageState extends State<PlayerPage> {
                       );
                     }
                   },
+                  onWatched: () {
+                    final drama = widget.drama.chapterCount == 0
+                        ? widget.drama.copyWith(
+                            chapterCount: state.episodes.length,
+                          )
+                        : widget.drama;
+                    // This is still useful for immediate history tagging
+                    context.read<PlayerBloc>().add(
+                      SaveProgressEvent(
+                        drama,
+                        index,
+                        episodeName: state.episodes[index].chapterName,
+                        provider: widget.provider,
+                        isHistoryUpdate: true,
+                      ),
+                    );
+                  },
+                  onProgress: (position, duration, isHistoryUpdate) {
+                    final drama = widget.drama.chapterCount == 0
+                        ? widget.drama.copyWith(
+                            chapterCount: state.episodes.length,
+                          )
+                        : widget.drama;
+                    context.read<PlayerBloc>().add(
+                      SaveProgressEvent(
+                        drama,
+                        index,
+                        episodeName: state.episodes[index].chapterName,
+                        provider: widget.provider,
+                        position: position,
+                        duration: duration,
+                        isHistoryUpdate: isHistoryUpdate,
+                      ),
+                    );
+                  },
+                  initialPosition: index == state.initialIndex
+                      ? state.initialPosition
+                      : 0,
                 );
               }, childCount: state.episodes.length),
             ),
