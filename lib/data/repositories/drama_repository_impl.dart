@@ -61,19 +61,25 @@ class DramaRepositoryImpl implements DramaRepository {
   @override
   Future<List<DramaModel>> getTrendingDramas({
     AppContentProvider provider = AppContentProvider.dramabox,
+    int page = 1,
   }) async {
     try {
       if (provider == AppContentProvider.dramabox) {
-        final remoteDramas = await dramaboxRemoteDataSource.getTrendingDramas();
-        await localDataSource.cacheTrendingDramas(remoteDramas);
+        final remoteDramas = await dramaboxRemoteDataSource.getTrendingDramas(
+          page: page,
+        );
+        if (page == 1) {
+          await localDataSource.cacheTrendingDramas(remoteDramas);
+        }
         return remoteDramas;
       } else {
-        final sections = await getHomeSections(provider: provider);
-        return sections.isNotEmpty ? sections.first.dramas : [];
+        return await netshortRemoteDataSource.getForYouDramas(page: page);
       }
     } catch (e) {
-      final cached = await localDataSource.getTrendingDramas();
-      if (cached != null) return cached;
+      if (page == 1) {
+        final cached = await localDataSource.getTrendingDramas();
+        if (cached != null) return cached;
+      }
       rethrow;
     }
   }
@@ -81,19 +87,25 @@ class DramaRepositoryImpl implements DramaRepository {
   @override
   Future<List<DramaModel>> getLatestDramas({
     AppContentProvider provider = AppContentProvider.dramabox,
+    int page = 1,
   }) async {
     try {
       if (provider == AppContentProvider.dramabox) {
-        final remoteDramas = await dramaboxRemoteDataSource.getLatestDramas();
-        await localDataSource.cacheLatestDramas(remoteDramas);
+        final remoteDramas = await dramaboxRemoteDataSource.getLatestDramas(
+          page: page,
+        );
+        if (page == 1) {
+          await localDataSource.cacheLatestDramas(remoteDramas);
+        }
         return remoteDramas;
       } else {
-        final sections = await getHomeSections(provider: provider);
-        return sections.length > 1 ? sections[1].dramas : [];
+        return await netshortRemoteDataSource.getForYouDramas(page: page);
       }
     } catch (e) {
-      final cached = await localDataSource.getLatestDramas();
-      if (cached != null) return cached;
+      if (page == 1) {
+        final cached = await localDataSource.getLatestDramas();
+        if (cached != null) return cached;
+      }
       rethrow;
     }
   }
@@ -101,19 +113,25 @@ class DramaRepositoryImpl implements DramaRepository {
   @override
   Future<List<DramaModel>> getVipDramas({
     AppContentProvider provider = AppContentProvider.dramabox,
+    int page = 1,
   }) async {
     try {
       if (provider == AppContentProvider.dramabox) {
-        final remoteDramas = await dramaboxRemoteDataSource.getVipDramas();
-        await localDataSource.cacheVipDramas(remoteDramas);
+        final remoteDramas = await dramaboxRemoteDataSource.getVipDramas(
+          page: page,
+        );
+        if (page == 1) {
+          await localDataSource.cacheVipDramas(remoteDramas);
+        }
         return remoteDramas;
       } else {
-        final sections = await getHomeSections(provider: provider);
-        return sections.length > 2 ? sections[2].dramas : [];
+        return await netshortRemoteDataSource.getForYouDramas(page: page);
       }
     } catch (e) {
-      final cached = await localDataSource.getVipDramas();
-      if (cached != null) return cached;
+      if (page == 1) {
+        final cached = await localDataSource.getVipDramas();
+        if (cached != null) return cached;
+      }
       rethrow;
     }
   }
@@ -143,11 +161,12 @@ class DramaRepositoryImpl implements DramaRepository {
   Future<List<DramaModel>> searchDramas(
     String query, {
     AppContentProvider provider = AppContentProvider.dramabox,
+    int page = 1,
   }) async {
     if (provider == AppContentProvider.dramabox) {
-      return await dramaboxRemoteDataSource.searchDramas(query);
+      return await dramaboxRemoteDataSource.searchDramas(query, page: page);
     } else {
-      return await netshortRemoteDataSource.searchDramas(query);
+      return await netshortRemoteDataSource.searchDramas(query, page: page);
     }
   }
 

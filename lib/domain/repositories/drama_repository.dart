@@ -13,12 +13,15 @@ abstract class DramaRepository {
   });
   Future<List<DramaModel>> getTrendingDramas({
     AppContentProvider provider = AppContentProvider.dramabox,
+    int page = 1,
   });
   Future<List<DramaModel>> getLatestDramas({
     AppContentProvider provider = AppContentProvider.dramabox,
+    int page = 1,
   });
   Future<List<DramaModel>> getVipDramas({
     AppContentProvider provider = AppContentProvider.dramabox,
+    int page = 1,
   });
   Future<List<DramaModel>?> getCachedTrendingDramas({
     AppContentProvider provider = AppContentProvider.dramabox,
@@ -32,6 +35,7 @@ abstract class DramaRepository {
   Future<List<DramaModel>> searchDramas(
     String query, {
     AppContentProvider provider = AppContentProvider.dramabox,
+    int page = 1,
   });
   Future<List<EpisodeModel>> getDramaEpisodes(
     String bookId, {

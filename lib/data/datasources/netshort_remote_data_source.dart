@@ -7,8 +7,8 @@ import 'package:dramabox_free/data/models/netshort_episode_model.dart';
 
 abstract class NetshortRemoteDataSource {
   Future<List<DramaSectionModel>> getTheaterDramas();
-  Future<List<DramaModel>> getForYouDramas(int page);
-  Future<List<DramaModel>> searchDramas(String query);
+  Future<List<DramaModel>> getForYouDramas({int page = 1});
+  Future<List<DramaModel>> searchDramas(String query, {int page = 1});
   Future<List<EpisodeModel>> getDramaEpisodes(String shortPlayId);
 }
 
@@ -41,14 +41,22 @@ class NetshortRemoteDataSourceImpl implements NetshortRemoteDataSource {
   }
 
   @override
-  Future<List<DramaModel>> getForYouDramas(int page) async {
+  Future<List<DramaModel>> getForYouDramas({int page = 1}) async {
     final response = await client.dio.get(
       '/netshort/foryou',
       queryParameters: {'page': page},
     );
     final data = response.data;
+
+    List? items;
     if (data is List) {
-      return data
+      items = data;
+    } else if (data is Map) {
+      items = data['contentInfos'] ?? data['dramas'] ?? data['items'];
+    }
+
+    if (items != null) {
+      return items
           .map((e) => NetshortDramaModel.fromJson(e).toDramaModel())
           .toList();
     }
@@ -56,10 +64,10 @@ class NetshortRemoteDataSourceImpl implements NetshortRemoteDataSource {
   }
 
   @override
-  Future<List<DramaModel>> searchDramas(String query) async {
+  Future<List<DramaModel>> searchDramas(String query, {int page = 1}) async {
     final response = await client.dio.get(
       '/netshort/search',
-      queryParameters: {'query': query},
+      queryParameters: {'query': query, 'page': page},
     );
     final data = response.data;
     if (data is Map && data['searchCodeSearchResult'] is List) {

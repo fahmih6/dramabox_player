@@ -22,6 +22,7 @@ class SearchPage extends StatefulWidget {
 class _SearchPageState extends State<SearchPage> {
   late final HomeBloc _homeBloc;
   final TextEditingController _searchController = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
 
   @override
   void initState() {
@@ -29,12 +30,24 @@ class _SearchPageState extends State<SearchPage> {
     _searchController.text = widget.query;
     _homeBloc = sl<HomeBloc>();
     _homeBloc.add(SearchDramasEvent(widget.query, provider: widget.provider));
+    _scrollController.addListener(_onScroll);
   }
 
   @override
   void dispose() {
     _searchController.dispose();
+    _scrollController.removeListener(_onScroll);
+    _scrollController.dispose();
     super.dispose();
+  }
+
+  void _onScroll() {
+    if (_scrollController.position.pixels >=
+        _scrollController.position.maxScrollExtent - 200) {
+      _homeBloc.add(
+        LoadMoreSearchEvent(_searchController.text, provider: widget.provider),
+      );
+    }
   }
 
   @override
@@ -101,7 +114,36 @@ class _SearchPageState extends State<SearchPage> {
                   ),
                 );
               }
-              return _buildDramaGrid(dramas);
+              return Stack(
+                children: [
+                  _buildDramaGrid(dramas),
+                  if (state.isLoadingMore)
+                    Positioned(
+                      bottom: 16,
+                      left: 0,
+                      right: 0,
+                      child: Center(
+                        child: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.7),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const SizedBox(
+                            width: 24,
+                            height: 24,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                Colors.amber,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              );
             } else if (state is HomeError) {
               return Center(
                 child: Text(
@@ -119,6 +161,7 @@ class _SearchPageState extends State<SearchPage> {
 
   Widget _buildDramaGrid(List<DramaModel> dramas) {
     return GridView.builder(
+      controller: _scrollController,
       padding: const EdgeInsets.all(16),
       physics: const BouncingScrollPhysics(),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
