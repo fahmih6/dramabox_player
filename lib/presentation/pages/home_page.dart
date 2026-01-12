@@ -240,8 +240,9 @@ class _HomePageState extends State<HomePage> {
                   }
 
                   final patch = snapshot.data;
+                  final baseVersion = sl<ShorebirdService>().appVersion;
                   final versionText =
-                      'v1.0.0+4${patch != null ? ' patch $patch' : ''}';
+                      '$baseVersion${patch != null ? ' (Patch $patch)' : ''}';
                   Widget statusWidget = const SizedBox.shrink();
                   Color? bgColor = Colors.black;
 
@@ -330,10 +331,18 @@ class _HomePageState extends State<HomePage> {
                       break;
                   }
 
-                  return Container(
-                    padding: const EdgeInsets.symmetric(vertical: 4),
-                    color: bgColor,
-                    child: SafeArea(top: false, child: statusWidget),
+                  return GestureDetector(
+                    onTap: () {
+                      if (status != ShorebirdUpdateStatus.checking &&
+                          status != ShorebirdUpdateStatus.downloading) {
+                        sl<ShorebirdService>().checkForUpdates();
+                      }
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      color: bgColor,
+                      child: SafeArea(top: false, child: statusWidget),
+                    ),
                   );
                 },
               );

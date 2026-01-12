@@ -48,6 +48,7 @@ dependencies:
   wakelock_plus: ^1.4.0
   shorebird_code_push: ^1.1.2
   bloc_concurrency: ^0.3.0
+  package_info_plus: ^9.0.0
 
 dev_dependencies:
   flutter_test:
