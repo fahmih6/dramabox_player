@@ -31,6 +31,9 @@ class SaveProgressEvent extends PlayerEvent {
   final int position; // in ms
   final int duration; // in ms
   final bool isHistoryUpdate;
+  final bool isSubtitlesEnabled;
+  final String? subtitleLanguage;
+
   SaveProgressEvent(
     this.drama,
     this.index, {
@@ -39,6 +42,8 @@ class SaveProgressEvent extends PlayerEvent {
     this.position = 0,
     this.duration = 0,
     this.isHistoryUpdate = false,
+    this.isSubtitlesEnabled = true,
+    this.subtitleLanguage,
   });
 
   @override
@@ -50,6 +55,8 @@ class SaveProgressEvent extends PlayerEvent {
     position,
     duration,
     isHistoryUpdate,
+    isSubtitlesEnabled,
+    subtitleLanguage,
   ];
 }
 
@@ -67,10 +74,25 @@ class PlayerLoaded extends PlayerState {
   final List<EpisodeModel> episodes;
   final int initialIndex;
   final int initialPosition;
-  PlayerLoaded(this.episodes, this.initialIndex, {this.initialPosition = 0});
+  final bool initialIsSubtitlesEnabled;
+  final String? initialSubtitleLanguage;
+
+  PlayerLoaded(
+    this.episodes,
+    this.initialIndex, {
+    this.initialPosition = 0,
+    this.initialIsSubtitlesEnabled = true,
+    this.initialSubtitleLanguage,
+  });
 
   @override
-  List<Object?> get props => [episodes, initialIndex, initialPosition];
+  List<Object?> get props => [
+    episodes,
+    initialIndex,
+    initialPosition,
+    initialIsSubtitlesEnabled,
+    initialSubtitleLanguage,
+  ];
 }
 
 class PlayerError extends PlayerState {
@@ -99,6 +121,9 @@ class PlayerBloc extends Bloc<PlayerEvent, PlayerState> {
         );
 
         int initialPosition = 0;
+        bool initialIsSubtitlesEnabled = true;
+        String? initialSubtitleLanguage;
+
         if (initialIndex >= 0) {
           final progress = await repository.getEpisodeProgress(
             event.bookId,
@@ -108,6 +133,36 @@ class PlayerBloc extends Bloc<PlayerEvent, PlayerState> {
           if (progress != null) {
             initialPosition = progress['position'] ?? 0;
           }
+
+          // Try to find the latest history entry for this drama to get subtitle preferences
+          final history = await repository.getHistory();
+          final dramaHistory = history.firstWhere(
+            (h) =>
+                h.drama.bookId == event.bookId && h.provider == event.provider,
+            orElse: () => history.firstWhere(
+              (h) => h.drama.bookId == event.bookId,
+              orElse: () => HistoryModel(
+                drama: DramaModel(
+                  bookId: '',
+                  bookName: '',
+                  coverWap: '',
+                  introduction: '',
+                  tags: const [],
+                  protagonist: '',
+                  chapterCount: 0,
+                ),
+                episodeIndex: 0,
+                episodeName: '',
+                provider: event.provider,
+                watchedAt: DateTime.now(),
+              ),
+            ),
+          );
+
+          if (dramaHistory.drama.bookId.isNotEmpty) {
+            initialIsSubtitlesEnabled = dramaHistory.isSubtitlesEnabled;
+            initialSubtitleLanguage = dramaHistory.subtitleLanguage;
+          }
         }
 
         emit(
@@ -115,6 +170,8 @@ class PlayerBloc extends Bloc<PlayerEvent, PlayerState> {
             episodes,
             initialIndex,
             initialPosition: initialPosition,
+            initialIsSubtitlesEnabled: initialIsSubtitlesEnabled,
+            initialSubtitleLanguage: initialSubtitleLanguage,
           ),
         );
       } catch (e) {
@@ -143,6 +200,8 @@ class PlayerBloc extends Bloc<PlayerEvent, PlayerState> {
               watchedAt: DateTime.now(),
               watchedPosition: event.position,
               totalDuration: event.duration,
+              isSubtitlesEnabled: event.isSubtitlesEnabled,
+              subtitleLanguage: event.subtitleLanguage,
             ),
           );
         }

@@ -10,6 +10,8 @@ class HistoryModel extends Equatable {
   final DateTime watchedAt;
   final int watchedPosition; // in milliseconds
   final int totalDuration; // in milliseconds
+  final bool isSubtitlesEnabled;
+  final String? subtitleLanguage;
 
   const HistoryModel({
     required this.drama,
@@ -19,6 +21,8 @@ class HistoryModel extends Equatable {
     required this.watchedAt,
     this.watchedPosition = 0,
     this.totalDuration = 0,
+    this.isSubtitlesEnabled = true,
+    this.subtitleLanguage,
   });
 
   factory HistoryModel.fromJson(Map<String, dynamic> json) {
@@ -35,6 +39,8 @@ class HistoryModel extends Equatable {
       ),
       watchedPosition: json['watchedPosition'] ?? 0,
       totalDuration: json['totalDuration'] ?? 0,
+      isSubtitlesEnabled: json['isSubtitlesEnabled'] ?? true,
+      subtitleLanguage: json['subtitleLanguage'],
     );
   }
 
@@ -47,6 +53,8 @@ class HistoryModel extends Equatable {
       'watchedAt': watchedAt.toIso8601String(),
       'watchedPosition': watchedPosition,
       'totalDuration': totalDuration,
+      'isSubtitlesEnabled': isSubtitlesEnabled,
+      'subtitleLanguage': subtitleLanguage,
     };
   }
 
@@ -58,5 +66,7 @@ class HistoryModel extends Equatable {
     watchedAt,
     watchedPosition,
     totalDuration,
+    isSubtitlesEnabled,
+    subtitleLanguage,
   ];
 }

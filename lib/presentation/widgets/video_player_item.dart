@@ -24,9 +24,17 @@ class VideoPlayerItem extends StatefulWidget {
   final VoidCallback onBack;
   final VoidCallback? onFinished;
   final VoidCallback? onWatched;
-  final void Function(int position, int duration, bool isHistoryUpdate)?
+  final void Function(
+    int position,
+    int duration,
+    bool isHistoryUpdate,
+    bool isSubtitlesEnabled,
+    String? subtitleLanguage,
+  )?
   onProgress;
   final int initialPosition;
+  final bool initialIsSubtitlesEnabled;
+  final String? initialSubtitleLanguage;
   final DramaModel drama;
   final List<EpisodeModel> episodes;
   final Function(int) onEpisodeSelected;
@@ -43,6 +51,8 @@ class VideoPlayerItem extends StatefulWidget {
     this.onWatched,
     this.onProgress,
     this.initialPosition = 0,
+    this.initialIsSubtitlesEnabled = true,
+    this.initialSubtitleLanguage,
     required this.drama,
     required this.episodes,
     required this.onEpisodeSelected,
@@ -71,9 +81,13 @@ class _VideoPlayerItemState extends State<VideoPlayerItem> {
   String _currentCaption = '';
   bool _subtitlesEnabled = true;
 
+  late VideoControlCubit _videoControlCubit;
+
   @override
   void initState() {
     super.initState();
+    _videoControlCubit = VideoControlCubit();
+    _subtitlesEnabled = widget.initialIsSubtitlesEnabled;
     _selectSubtitle();
     _initializeController();
     _startHideTimer();
@@ -82,18 +96,29 @@ class _VideoPlayerItemState extends State<VideoPlayerItem> {
   void _selectSubtitle() {
     if (widget.episode.subtitles.isEmpty) return;
 
+    if (widget.initialSubtitleLanguage != null) {
+      _selectedSubtitle = widget.episode.subtitles.firstWhere(
+        (s) => s.language == widget.initialSubtitleLanguage,
+        orElse: () => _getDefaultSubtitle(),
+      );
+    } else {
+      _selectedSubtitle = _getDefaultSubtitle();
+    }
+
+    if (_selectedSubtitle != null) {
+      _loadSubtitles(_selectedSubtitle!.url);
+    }
+  }
+
+  SubtitleModel _getDefaultSubtitle() {
     // Prioritize Indonesia (ID) first
-    _selectedSubtitle = widget.episode.subtitles.firstWhere(
+    return widget.episode.subtitles.firstWhere(
       (s) => s.language.toLowerCase().contains('id'),
       orElse: () => widget.episode.subtitles.firstWhere(
         (s) => s.language.toLowerCase().contains('en'),
         orElse: () => widget.episode.subtitles.first,
       ),
     );
-
-    if (_selectedSubtitle != null) {
-      _loadSubtitles(_selectedSubtitle!.url);
-    }
   }
 
   Future<void> _loadSubtitles(String url) async {
@@ -166,7 +191,7 @@ class _VideoPlayerItemState extends State<VideoPlayerItem> {
       final minutes = int.parse(parts[1]);
       final secondsParts = parts[2].split('.');
       final seconds = int.parse(secondsParts[0]);
-      final milliseconds = int.parse(secondsParts[1]);
+      final milliseconds = int.parse(secondsParts[1].padRight(3, '0'));
       return Duration(
         hours: hours,
         minutes: minutes,
@@ -177,7 +202,7 @@ class _VideoPlayerItemState extends State<VideoPlayerItem> {
       final minutes = int.parse(parts[0]);
       final secondsParts = parts[1].split('.');
       final seconds = int.parse(secondsParts[0]);
-      final milliseconds = int.parse(secondsParts[1]);
+      final milliseconds = int.parse(secondsParts[1].padRight(3, '0'));
       return Duration(
         minutes: minutes,
         seconds: seconds,
@@ -314,6 +339,8 @@ class _VideoPlayerItemState extends State<VideoPlayerItem> {
           position.inMilliseconds,
           duration.inMilliseconds,
           currentSecond % 2 == 0,
+          _subtitlesEnabled,
+          _selectedSubtitle?.language,
         );
       }
     }
@@ -323,7 +350,7 @@ class _VideoPlayerItemState extends State<VideoPlayerItem> {
     _hideTimer?.cancel();
     _hideTimer = Timer(const Duration(seconds: 3), () {
       if (mounted) {
-        context.read<VideoControlCubit>().setControlsVisible(false);
+        _videoControlCubit.setControlsVisible(false);
       }
     });
   }
@@ -354,6 +381,7 @@ class _VideoPlayerItemState extends State<VideoPlayerItem> {
   void dispose() {
     _hideTimer?.cancel();
     _player?.dispose();
+    _videoControlCubit.close();
     super.dispose();
   }
 
@@ -380,8 +408,8 @@ class _VideoPlayerItemState extends State<VideoPlayerItem> {
 
   @override
   Widget build(BuildContext context) {
-    return BlocProvider(
-      create: (_) => VideoControlCubit(),
+    return BlocProvider.value(
+      value: _videoControlCubit,
       child: BlocConsumer<VideoControlCubit, VideoControlState>(
         listener: (context, state) {
           // Handle side effects like player control
@@ -399,8 +427,8 @@ class _VideoPlayerItemState extends State<VideoPlayerItem> {
               // Actually the Seek side effect (video position) is handled here.
               // The visual feedback is handled by the builder.
               Future.delayed(const Duration(milliseconds: 500), () {
-                if (context.mounted) {
-                  context.read<VideoControlCubit>().clearSeek();
+                if (mounted) {
+                  _videoControlCubit.clearSeek();
                 }
               });
             }
@@ -532,7 +560,7 @@ class _VideoPlayerItemState extends State<VideoPlayerItem> {
                 // Layer 1: Background Toggle Layer (Handles taps on empty space)
                 Positioned.fill(
                   child: VideoGestureOverlay(
-                    videoControlCubit: context.read<VideoControlCubit>(),
+                    videoControlCubit: _videoControlCubit,
                   ),
                 ),
 

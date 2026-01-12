@@ -146,30 +146,47 @@ class _PlayerPageState extends State<PlayerPage> {
                         episodeName: state.episodes[index].chapterName,
                         provider: widget.provider,
                         isHistoryUpdate: true,
+                        // We don't have immediate access to current subtitle state here
+                        // but it will be picked up by the next periodic progress update
                       ),
                     );
                   },
-                  onProgress: (position, duration, isHistoryUpdate) {
-                    final drama = widget.drama.chapterCount == 0
-                        ? widget.drama.copyWith(
-                            chapterCount: state.episodes.length,
-                          )
-                        : widget.drama;
-                    context.read<PlayerBloc>().add(
-                      SaveProgressEvent(
-                        drama,
-                        index,
-                        episodeName: state.episodes[index].chapterName,
-                        provider: widget.provider,
-                        position: position,
-                        duration: duration,
-                        isHistoryUpdate: isHistoryUpdate,
-                      ),
-                    );
-                  },
+                  onProgress:
+                      (
+                        position,
+                        duration,
+                        isHistoryUpdate,
+                        isSubtitlesEnabled,
+                        subtitleLanguage,
+                      ) {
+                        final drama = widget.drama.chapterCount == 0
+                            ? widget.drama.copyWith(
+                                chapterCount: state.episodes.length,
+                              )
+                            : widget.drama;
+                        context.read<PlayerBloc>().add(
+                          SaveProgressEvent(
+                            drama,
+                            index,
+                            episodeName: state.episodes[index].chapterName,
+                            provider: widget.provider,
+                            position: position,
+                            duration: duration,
+                            isHistoryUpdate: isHistoryUpdate,
+                            isSubtitlesEnabled: isSubtitlesEnabled,
+                            subtitleLanguage: subtitleLanguage,
+                          ),
+                        );
+                      },
                   initialPosition: index == state.initialIndex
                       ? state.initialPosition
                       : 0,
+                  initialIsSubtitlesEnabled: index == state.initialIndex
+                      ? state.initialIsSubtitlesEnabled
+                      : true,
+                  initialSubtitleLanguage: index == state.initialIndex
+                      ? state.initialSubtitleLanguage
+                      : null,
                   provider: widget.provider,
                 );
               }, childCount: state.episodes.length),
